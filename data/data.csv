@@ -1,0 +1,7 @@
+timestamp,location_id,location_name,hour,checkins
+2025-11-10T06:00,1,LA Fitness Brickell,6,12
+2025-11-10T07:00,1,LA Fitness Brickell,7,30
+2025-11-10T08:00,1,LA Fitness Brickell,8,55
+2025-11-10T06:00,2,LA Fitness Kendall,6,10
+2025-11-10T07:00,2,LA Fitness Kendall,7,22
+2025-11-10T08:00,2,LA Fitness Kendall,8,48
