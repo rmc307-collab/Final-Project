@@ -1,0 +1,122 @@
+data/
+gui/
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Gym Ledger — Attendance & Forecast</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css">
+    <style>
+      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial; margin: 18px; color:#202124 }
+      .container { max-width: 1100px; margin: 0 auto }
+      .row { display:flex; gap:12px; align-items:center }
+      label { font-weight:600 }
+      input[type=text], input[type=number], input[type=date] { padding:6px 8px; border-radius:4px; border:1px solid #ccc }
+      button { padding:8px 12px; border-radius:6px; border:1px solid #888; background:#fff }
+      #output { white-space:pre-wrap; background:#f6f8fa; padding:12px; border-radius:6px; min-height:120px }
+      canvas { background:#fff; border:1px solid #ddd; border-radius:6px }
+      .controls { margin-bottom:12px }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Gym Ledger — Attendance & Forecast</h1>
+
+      <section class="controls">
+        <div style="margin-bottom:8px">
+          <label>Gym Location</label>
+          <input id="loc" type="text" value="Brickell">
+          <label style="margin-left:12px">Time (hour)</label>
+          <input id="time" type="number" min="0" max="23" value="18">
+          <label style="margin-left:12px">Attendance</label>
+          <input id="att" type="number" min="0" value="50">
+          <label style="margin-left:12px">Cleanliness (1–10)</label>
+          <input id="clean" type="number" min="1" max="10" value="8">
+          <label style="margin-left:12px">Date</label>
+          <input id="date" type="date" value="">
+        </div>
+
+        <div>
+          <button id="addBtn">➕ Add Entry</button>
+          <button id="forecastBtn">📈 Run Forecast</button>
+          <button id="chartBtn">📊 View Chart</button>
+        </div>
+      </section>
+
+      <section>
+        <div id="output"></div>
+      </section>
+
+      <section style="margin-top:18px">
+        <canvas id="attendanceChart" width="1000" height="360"></canvas>
+      </section>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+      // Utilities
+      function el(id){return document.getElementById(id)}
+
+      function nowISODate(){return new Date().toISOString().slice(0,10)}
+      if(!el('date').value) el('date').value = nowISODate()
+
+      async function api(path, opts){
+        const res = await fetch(path, opts)
+        return res.json()
+      }
+
+      // Add Entry
+      el('addBtn').addEventListener('click', async ()=>{
+        const payload = {
+          Location: el('loc').value,
+          Time: String(el('time').value),
+          Attendance: String(el('att').value),
+          Cleanliness: String(el('clean').value),
+          Date: el('date').value
+        }
+        const r = await api('/api/entry', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)})
+        el('output').textContent = JSON.stringify(r, null, 2)
+        loadAndDraw()
+      })
+
+      // Forecast
+      el('forecastBtn').addEventListener('click', async ()=>{
+        el('output').textContent = 'Running forecast...'
+        const r = await api('/api/forecast')
+        el('output').textContent = JSON.stringify(r, null, 2)
+      })
+
+      // Chart
+      let chart = null
+      el('chartBtn').addEventListener('click', ()=>loadAndDraw())
+
+      async function loadAndDraw(){
+        const data = await api('/api/data')
+        if(!data || !Array.isArray(data.rows)) return
+
+        // Aggregate by Time
+        const labels = data.rows.map(r=>r.Time)
+        const attendance = data.rows.map(r=>Number(r.Attendance))
+        const cleanliness = data.rows.map(r=>Number(r.Cleanliness))
+
+        const ctx = el('attendanceChart').getContext('2d')
+        if(chart) chart.destroy()
+        chart = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels,
+            datasets: [
+              { label: 'Attendance', data: attendance, backgroundColor: '#4e79a7' },
+              { label: 'Cleanliness', data: cleanliness, type: 'line', borderColor: '#f28e2b', fill:false }
+            ]
+          },
+          options: { interaction: { mode: 'index' }, scales: { x: { title: { display: true, text: 'Time (Hour of Day)' } }, y: { title: { display:true, text:'Value' } } } }
+        })
+      }
+
+      // Load initial data
+      loadAndDraw()
+    </script>
+  </body>
+</html>
