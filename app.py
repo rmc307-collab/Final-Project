@@ -1,13 +1,12 @@
 from flask import Flask, send_from_directory, abort, jsonify, request
-import os, csv
+import os, csv, tempfile
 from pathlib import Path
-import tempfile
 
 app = Flask(__name__, static_folder='public')
 
 # Data path
 DATA_DIR = Path(os.getcwd()) / 'data'
-DATA_DIR.mkdir(exist_ok=True)
+DATA_DIR.mkdir(parents=True, exist_ok=True)
 DATA_FILE = DATA_DIR / 'attendance.csv'
 
 # Try to import Julia executor if available
@@ -45,9 +44,9 @@ def api_data():
 
 @app.route('/api/entry', methods=['POST'])
 def api_entry():
-    payload = request.get_json(force=True)
+    payload = request.get_json(force=True) or {}
     # Ensure header
-    write_header = not DATA_FILE.exists()
+    write_header = not DATA_FILE.exists() or DATA_FILE.stat().st_size == 0
     with open(DATA_FILE, 'a', newline='') as f:
         writer = csv.writer(f)
         if write_header:
@@ -66,7 +65,8 @@ def get_julia_executor():
             return None
         try:
             _julia_executor = SimpleJuliaExecutor()
-        except Exception:
+        except Exception as e:
+            print(f"Failed to start Julia executor: {e}")
             _julia_executor = None
     return _julia_executor
 
@@ -78,7 +78,7 @@ def api_forecast():
         return jsonify({'success': False, 'error': 'Julia not available'}), 500
 
     # Minimal Julia code: return a simple dict
-    code = 'result = Dict("success"=>true, "message"=>"Hello from Julia")\nresult'
+    code = 'result = Dict("success"=>true, "message"=>"Hello from Julia")\\nresult'
     with tempfile.NamedTemporaryFile(delete=False, suffix='.jl', mode='w') as tf:
         tf.write(code)
         temp_path = tf.name
